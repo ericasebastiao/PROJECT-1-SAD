@@ -62,7 +62,7 @@
  */
 // TODO Insert declarations or function prototypes (right here) to leverage 
 // live documentation
-int digital_Read();
+int digital_Read(int portNumber);
 void digital_Write(int n);
 #ifdef	__cplusplus
 extern "C" {
