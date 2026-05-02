@@ -66,6 +66,8 @@
 // TODO Insert declarations or function prototypes (right here) to leverage 
 // live documentation
 
+void timer_initialize();
+
 #ifdef	__cplusplus
 extern "C" {
 #endif /* __cplusplus */

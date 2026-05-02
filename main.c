@@ -6,6 +6,7 @@
 #include "p24fj1024gb610.h"
 #include "UART1.h"
 #include "ADC.h"
+#include "timer.h"
 #include <libpic30.h> 
 
 // 2. Definiï¿½ï¿½es de Frequï¿½ncia para Delays
@@ -18,6 +19,8 @@
 #define LCD_RW  LATDbits.LATD5
 #define LCD_DATA LATE
 
+#define MAX_BUFFER_PORT 20
+
 // 1. Bits de Configuraï¿½ï¿½o (Essenciais para evitar que o PIC reinicie)
 #pragma config FWDTEN = OFF      // Watchdog Timer desligado
 #pragma config FNOSC = PRI       // Oscilador Primï¿½rio (8MHz)
@@ -25,29 +28,36 @@
 #pragma config ICS = PGD1        // Debugging nos pinos standard
 
 int variavelRandom = 0;
-int freqControl = 3; // 4*T(em segundos) - 1
+int freqControl = 1; // 4*T(em segundos) - 1
 
 // INTERRUPT FLAGS
 int PrintFLAG = 0;
 int SampleFLAG = 0;
 
-void __attribute__((__interrupt__, __shadow__)) _T1Interrupt(void)
-{
-    if (variavelRandom < freqControl){
-        variavelRandom++;
-        
-        IFS0bits.T1IF = 0;
-        return;
-    }
-    
-    //FLAGS ONLY
-    PrintFLAG = 1;
-    
-    variavelRandom = 0;
+//Buffer json, indice, e flag json completo 
+char json[1024];
+int i_json = 0;
+int json_complete = 0;
 
-    /* Interrupt Service Routine code goes here */
-    IFS0bits.T1IF = 0; //Reset Timer1 interrupt flag and Return from ISR   
-}
+//Variaveis do JSON
+int analogPortX = 0;
+int analogPortX_array[MAX_BUFFER_PORT];
+int analogPortY = 0;
+int analogPortY_array[MAX_BUFFER_PORT];
+int analogPortZ = 0;
+int analogPortZ_array[MAX_BUFFER_PORT];
+int digital6 = 0;
+int digital7 = 0;
+int bidirecional = 0;
+int virtual = 0;
+int state_bidirecional = 0;
+int state_virtual = 0;
+volatile int time_sampling = 1; //segundos
+volatile int samples = 5; //Numero de amostras a enviar de cada vez
+int digital1write = 0; //Saida digital
+//FLAGS, Interrupt decide enviar e 
+volatile int read = 0;
+volatile int i_samples = 0;
 
 //JSON example {"OUTPUT1":1, "" } - 
 /*void JsonConstructer (char* JSON, int outputAnalog0[], int outputAnalog1[],int outputAnalog2[],int outputdigital0[],int outputdigital1[], int outputdigitalB[]){
@@ -210,70 +220,167 @@ void __attribute__((__interrupt__, __shadow__)) _T1Interrupt(void)
     return 0;
 }*/
 
+void timer_initialize(){
+    T1CON = 0x00; //Stops the Timer1 and reset control reg.
+    TMR1 = 0x00; //Clear contents of the timer register
+    PR1 = 0xF423; // tinhamos assim anteriormente 0xFFFF; //Load the Period register with the value 0xFFFF
+    IPC0bits.T1IP = 0x01; //Setup Timer1 interrupt for desired priority level
+    // (This example assigns level 1 priority)
+    T1CONbits.TCKPS1 = 1; //define prescaler 1:64
+    T1CONbits.TCKPS0 = 0;
+    IFS0bits.T1IF = 0; //Clear the Timer1 interrupt status flag
+    IEC0bits.T1IE = 1; //Enable Timer1 interrupts
+    T1CONbits.TON = 1; //Start Timer1 with prescaler settings at 1:1 and
+//clock source set to the internal instruction cycle
+}
+
+void __attribute__((__interrupt__, __shadow__)) _T1Interrupt(void)
+{
+  
+    variavelRandom++; 
+
+    
+    if (variavelRandom >= time_sampling) 
+    {
+        read = 1;               
+        PrintFLAG = 1;         
+        variavelRandom = 0;     
+    }
+    IFS0bits.T1IF = 0; 
+}
+
 void JsonParser(){
-    ;
-}
+    char *position;
 
-void LCD_Pulse(void) {
-    LCD_E = 1;
-    __delay_us(50); // Aguarda estabilizaï¿½ï¿½o
-    LCD_E = 0;
-    __delay_us(50);
-}
-
-void LCD_Command(unsigned char cmd) {
-    LCD_RS = 0; // Modo Comando
-    
-    // Envia os 4 bits superiores
-    LATE = (LATE & 0xFFF0) | ((cmd >> 4) & 0x0F);
-    LCD_Pulse();
-    
-    // Envia os 4 bits inferiores
-    LATE = (LATE & 0xFFF0) | (cmd & 0x0F);
-    LCD_Pulse();
-}
-
-void LCD_Char(char data) {
-    LCD_RS = 1; // RS = 1 para Dados
-    
-    // Envia nibble superior
-    LATE = (LATE & 0xFFF0) | ((data >> 4) & 0x0F);
-    LCD_Pulse();
-    
-    // Envia nibble inferior
-    LATE = (LATE & 0xFFF0) | (data & 0x0F);
-    LCD_Pulse();
-    
-    __delay_us(100);
-}
-
-// Envia uma string completa
-void LCD_String(const char* str) {
-    while(*str) {
-        LCD_Char(*str++);
+    position = strstr(json, "\"b\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            state_bidirecional = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"v\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            state_virtual = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"Ax\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            analogPortX = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"Ay\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            analogPortY = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"Az\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            analogPortZ = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"D6\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            digital6 = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"D7\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            digital7 = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"DB\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            bidirecional = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"DV\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            virtual = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"p\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            time_sampling = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"n\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            samples = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"DW\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            digital1write = atoi(position + 1); 
+        }
     }
 }
+void send_array_json(char* port, int* array, int num_samples, int* first)
+{
+    char buffer[16];
 
-void LCD_Init(void) {
-    __delay_ms(100);    // Aguarda o LCD estabilizar apï¿½s power-on
+    //Condicao para saber se põe virgula
+    if (!(*first)) {
+        UART1_Print (",");
+    }
+
+    UART1_Print ("\"");
+    UART1_Print (port);
+    UART1_Print ("\":[");
+
+    // Imprime os valores do array separados por vírgula
+    for (int i = 0; i < num_samples; i++) {
+        sprintf(buffer, "%d", array[i]);
+        UART1_Print (buffer);
+        if (i < (num_samples - 1)) {
+            UART1_Print (",");
+        }
+    }
+    UART1_Print ("]");
+
+    *first = 0;
     
-    LCD_RS = 0;
-    LCD_RW = 0;
-    LCD_E = 0;
+}
+void send_json()
+{
+    int first = 1; 
 
-    // Sequï¿½ncia de Reset para modo 4-bit
-    LATE = (LATE & 0xFFF0) | 0x03; LCD_Pulse(); __delay_ms(5);
-    LATE = (LATE & 0xFFF0) | 0x03; LCD_Pulse(); __delay_us(200);
-    LATE = (LATE & 0xFFF0) | 0x03; LCD_Pulse();
-    
-    LATE = (LATE & 0xFFF0) | 0x02; // Configura modo 4-bit definitivo
-    LCD_Pulse();
+    UART1_Print ("{");
 
-    LCD_Command(0x28);  // 2 linhas, matriz 5x7
-    LCD_Command(0x0C);  // Display ON, Cursor OFF
-    LCD_Command(0x06);  // Incremento automï¿½tico do cursor
-    LCD_Command(0x01);  // Limpa ecrï¿½
-    __delay_ms(5);
+    if (analogPortX) {
+        send_array_json("Ax", analogPortX_array, samples, &first);
+    }
+    if (analogPortY) {
+        send_array_json("Ay", analogPortY_array, samples, &first);
+    }
+    if (analogPortZ) {
+        send_array_json("Az", analogPortZ_array, samples, &first);
+    }
+
+    UART1_Print ("}\r\n");
+
 }
 
 
@@ -282,28 +389,13 @@ int main(int argc, char** argv){
     int adcvalue = 0;
     int button = 0;
 
-    T1CON = 0x00; //Stops the Timer1 and reset control reg.
-    TMR1 = 0x00; //Clear contents of the timer register
-    PR1 = 0xFFFF; //Load the Period register with the value 0xFFFF
-    IPC0bits.T1IP = 0x01; //Setup Timer1 interrupt for desired priority level
-    // (This example assigns level 1 priority)
-    T1CONbits.TCKPS1 = 0; //define prescaler 1:8
-    T1CONbits.TCKPS0 = 1;
-    IFS0bits.T1IF = 0; //Clear the Timer1 interrupt status flag
-    IEC0bits.T1IE = 1; //Enable Timer1 interrupts
-    T1CONbits.TON = 1; //Start Timer1 with prescaler settings at 1:1 and
-    //clock source set to the internal instruction cycle
-    
+    timer_initialize();
     ADC_Setup();
     UART1Config();
     
     ANSD = 1;
     TRISA = 0;
     TRISDbits.TRISD6 = 1;
-
-     int analogPort1 = 4;
-    int analogPort2 = 5;
-    int analogPort3 = 6;
 
     //char Config_Json[MAX_JSON_SIZE] = ""; 
     //char Sender_JSON[MAX_JSON_SIZE] = ""; 
@@ -319,30 +411,49 @@ int main(int argc, char** argv){
     
     ANSELBbits.ANSB15 = 0; // Garante que RB15 ï¿½ Digital (importante!)
     
-    LCD_Init();
-
-    /*    LCD_RW = 0; 
-    
  
-    __delay_ms(50);     
-    LCD_Command(0x02);  
-    LCD_Command(0x28);  
-    LCD_Command(0x0C);   
-    LCD_Command(0x01);  
-    __delay_ms(2);
- */
-      
-      
-      
-
-    // 3. Escrever a Mensagem
-    LCD_Command(0x80);    
-    LCD_String("START");
-    
-    //LCD_Command(0xC0);        
-    //LCD_String("PIC24FJ1024");
-    
     while(1){
+        if (UART1_Available())
+        {
+            char received = UART1_Read();
+            json[i_json] = received;
+            i_json++;
+            if (received == '}')
+            {
+                json_complete = 1;
+                json[i_json] = '\0';
+            }
+                
+            if (i_json >= 1023)
+                i_json = 0;   
+        }
+        if (json_complete)
+        {
+            JsonParser();
+            json_complete = 0;
+            i_json = 0;
+            i_samples = 0;
+        }
+        if (read)
+        {
+            if (i_samples < samples)
+            {
+                if (analogPortX)
+                    analogPortX_array[i_samples] = ADC_Read(4);
+                if (analogPortY)
+                    analogPortY_array[i_samples] = ADC_Read(5);
+                if (analogPortZ)
+                    analogPortZ_array[i_samples] = ADC_Read(6);
+                //CONTINUAR ISTO PARA TODAS AS PORTAS
+                i_samples++;
+                if (i_samples >= samples)
+                {
+                    send_json();
+                    i_samples = 0; 
+                }
+            }
+            read = 0;
+        }
         
     }
 
@@ -379,70 +490,6 @@ int main(int argc, char** argv){
     
     return 0;
 }
-
-
-/*
-#include <stdio.h>
-#include <stdlib.h>
-#include <xc.h>
-
-#include "p24fj1024gb610.h"
-
-//#define Fos 8000000
-//#define PreScalar 256
-//#define IPerS Fos / 2 / PreScalar
-//#define FCY 4000000
-//
-//// Configuration Bits TIMER1
-//#pragma config FNOSC = PRI
-//#pragma config POSCMOD = HS
-//#pragma config JTAGEN = OFF
-//#pragma config FWDTEN = OFF
-//
-//void setupTimer1()
-//{    
-//    TMR1 = 0;
-//    PR1 = IPerS;
-//    IPC0bits.T1IP = 0x7;
-//    IFS0bits.T1IF = 0;
-//    IEC0bits.T1IE = 1;
-//    // 0bx1000 0000 0011 0000
-//    T1CON = 0x8030;
-//}
-//
-//void __attribute__ ( ( interrupt, __shadow__ ) ) _T1Interrupt(void)
-//{
-//    IFS0bits.T1IF = 0;
-//    TMR1 = 0;
-//} 
-
-int main(int argc, char** argv) {
-    ANSD = 1;
-    TRISA = 0;
-    TRISDbits.TRISD6 = 1;
-    
-    //LATA = 0xFFFF;
-    LATA = 0;
-
-    
-    while(1){
-       // run
-       if (!PORTDbits.RD6) {
-           //LATA = ~LATA;
-           PORTAbits.RA0 = 1;
-           PORTAbits.RA2 = 1;
-       }
-       if (!PORTDbits.RD7) {
-           //LATA = ~LATA;
-           PORTAbits.RA0 = 0;
-           //PORTAbits.RA2 = 0;
-       }
-   }
-    return (1);
-}
-*/
-
-
 
 
 
