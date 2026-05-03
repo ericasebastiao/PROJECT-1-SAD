@@ -255,6 +255,11 @@ void send_json()
 
 }
 
+void Shift_Vetors(int* buffer){
+  for(int i=samples-1; i>0; i--){
+  	buffer[i]= buffer[i-1];
+  }
+}
 
 int main(int argc, char** argv){
     timer_initialize();
@@ -297,50 +302,81 @@ int main(int argc, char** argv){
             i_json = 0;
             i_samples = 0;
         }
-        if (bidirecional){
-        if (!state_bidirecional) 
+        if (bidirecional)
         {
-            TRISAbits.TRISA7 = 0;  
-            LATAbits.LATA7 = 1;    
+            if (!state_bidirecional) 
+            {
+                TRISAbits.TRISA7 = 0;
+                for(int i=0; i<5; i++);
+                LATAbits.LATA7 = 1;    
+            }
+            else 
+            {
+                TRISAbits.TRISA7 = 0;
+                for(int i=0; i<5; i++);
+                LATAbits.LATA7 = 0;   
+                 
+            }
         }
-        else 
-        {
-            LATAbits.LATA7 = 0;   
-            TRISAbits.TRISA7 = 1;  
-        }}
+        
 
             LATAbits.LATA0 = digitalwrite1; 
             LATAbits.LATA1 = digitalwrite2;
             LATAbits.LATA2 = digitalwrite3;
         if (read)
         {
-            if (i_samples < samples)
-            {
                 if (analogPortX)
-                    analogPortX_array[i_samples] = ADC_Read(4);
+                {
+                    Shift_Vetors(analogPortX_array);
+                    analogPortX_array[0] = ADC_Read(4);
+                }
+                    
                 if (analogPortY)
-                    analogPortY_array[i_samples] = ADC_Read(5);
+                {
+                    Shift_Vetors(analogPortY_array);
+                    analogPortY_array[0] = ADC_Read(5);
+                }
+                
                 if (analogPortZ)
-                    analogPortZ_array[i_samples] = ADC_Read(2);
+                {
+                    Shift_Vetors(analogPortZ_array);
+                    analogPortZ_array[0] = ADC_Read(2);
+                }
+                    
                 if (digital6 && !state_virtual)
-                    digital6_array[i_samples] = digital_Read(54);
+                {
+                    Shift_Vetors(digital6_array);
+                    digital6_array[0] = digital_Read(54);
+                }
+                    
                 if (digital7 && !state_virtual)
-                    digital7_array[i_samples] = digital_Read(55);
+                {
+                    Shift_Vetors(digital7_array);
+                    digital7_array[0] = digital_Read(55);
+                }
+                    
                 if (bidirecional && state_bidirecional)
                 {
                     TRISAbits.TRISA7 = 1;
-                    bidirecional_array[i_samples] = digital_Read(56);
+                    CNPUAbits.CNPUA7 = 1;
+                    for(int i=0; i<5; i++);
+                    Shift_Vetors(bidirecional_array);
+                    bidirecional_array[0] = digital_Read(56);
                 }    
                 if (virtual && state_virtual)
-                    virtual_array[i_samples] = 2*digital_Read(55) + digital_Read(54);
-                
-                i_samples++;
+                {
+                    Shift_Vetors(virtual_array);
+                    virtual_array[0] = 2*digital_Read(55) + digital_Read(54);
+                }
+                    
+                if(i_samples < samples)
+                    i_samples++;
                 if (i_samples >= samples)
                 {
                     send_json();
-                    i_samples = 0; 
+                    
                 }
-            }
+            
             read = 0;
         }
     }
