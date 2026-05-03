@@ -47,178 +47,25 @@ int analogPortY_array[MAX_BUFFER_PORT];
 int analogPortZ = 0;
 int analogPortZ_array[MAX_BUFFER_PORT];
 int digital6 = 0;
+int digital6_array[MAX_BUFFER_PORT];
 int digital7 = 0;
+int digital7_array[MAX_BUFFER_PORT];
 int bidirecional = 0;
+int bidirecional_array[MAX_BUFFER_PORT];
 int virtual = 0;
+int virtual_array[MAX_BUFFER_PORT];
 int state_bidirecional = 0;
 int state_virtual = 0;
 volatile int time_sampling = 1; //segundos
 volatile int samples = 5; //Numero de amostras a enviar de cada vez
-int digital1write = 0; //Saida digital
+int digitalwrite1 = 0; //Saida digital
+int digitalwrite2 = 0; //Saida digital
+int digitalwrite3 = 0; //Saida digital
+
 //FLAGS, Interrupt decide enviar e 
 volatile int read = 0;
 volatile int i_samples = 0;
 
-//JSON example {"OUTPUT1":1, "" } - 
-/*void JsonConstructer (char* JSON, int outputAnalog0[], int outputAnalog1[],int outputAnalog2[],int outputdigital0[],int outputdigital1[], int outputdigitalB[]){
-     //Clean the json
-    int i = 0;
-    for(i = 0; i<MAX_JSON_SIZE ; i++){
-        JSON[i] = '\0';
-    }
-    
-    sprintf(JSON, "{\"A0\":[");
-    
-    
-    char A0_samples[MAX_JSON_SIZE];
-    for(int i=0; i<MAX_JSON_SIZE; i++){A0_samples[i] = '\0';}
-    
-    char temp[10];
-    for(int i=0; i<SamplesN; i++){
-        //CLEAN
-        for(int i=0; i<10; i++){temp[i] = '\0';}
-        
-        
-        sprintf(temp, "%d", outputAnalog0[i]);
-        
-        if(i<(SamplesN-1)){strcat(temp, ",");}
-        
-        
-        strcat(A0_samples, temp);
-        //printf("\n%s", A0_samples);
-    }
-    strcat(A0_samples, "]");
-    strcat(JSON, A0_samples);
-    
-    
-    //////////////////////////////////////////////////////
-    
-    
-    strcat(JSON, ",\"A1\":[");
-    char A1_samples[MAX_JSON_SIZE];
-    for(int i=0; i<MAX_JSON_SIZE; i++){A1_samples[i] = '\0';}
-
-
-    for(int i=0; i<SamplesN; i++){
-        //CLEAN
-        for(int i=0; i<10; i++){temp[i] = '\0';}
-        
-        
-        sprintf(temp, "%d", outputAnalog1[i]);
-        
-        if(i<(SamplesN-1)){strcat(temp, ",");}
-        
-        
-        strcat(A1_samples, temp);
-        //printf("\n%s", A0_samples);
-    }
-    strcat(A1_samples, "]");
-    strcat(JSON, A1_samples);
-    
-    
-    //////////////////////////////////////////////////////
-    
-    
-    strcat(JSON, ",\"A2\":[");
-    char A2_samples[MAX_JSON_SIZE];
-    for(int i=0; i<MAX_JSON_SIZE; i++){A2_samples[i] = '\0';}
-
-
-    for(int i=0; i<SamplesN; i++){
-        //CLEAN
-        for(int i=0; i<10; i++){temp[i] = '\0';}
-        
-        
-        sprintf(temp, "%d", outputAnalog2[i]);
-        
-        if(i<(SamplesN-1)){strcat(temp, ",");}
-        
-        
-        strcat(A2_samples, temp);
-        //printf("\n%s", A0_samples);
-    }
-    strcat(A2_samples, "]");
-    strcat(JSON, A2_samples);
-    
-    
-    //////////////////////////////////////////////////////
-    
-    
-    strcat(JSON, ",\"D0\":[");
-    char D0_samples[MAX_JSON_SIZE];
-    for(int i=0; i<MAX_JSON_SIZE; i++){D0_samples[i] = '\0';}
-
-
-    for(int i=0; i<SamplesN; i++){
-        //CLEAN
-        for(int i=0; i<10; i++){temp[i] = '\0';}
-        
-        
-        sprintf(temp, "%d", outputdigital0[i]);
-        
-        if(i<(SamplesN-1)){strcat(temp, ",");}
-        
-        
-        strcat(D0_samples, temp);
-        //printf("\n%s", A0_samples);
-    }
-    strcat(D0_samples, "]");
-    strcat(JSON, D0_samples);
-    
-    
-    //////////////////////////////////////////////////////
-    
-    
-    strcat(JSON, ",\"D1\":[");
-    char D1_samples[MAX_JSON_SIZE];
-    for(int i=0; i<MAX_JSON_SIZE; i++){D1_samples[i] = '\0';}
-
-
-    for(int i=0; i<SamplesN; i++){
-        //CLEAN
-        for(int i=0; i<10; i++){temp[i] = '\0';}
-        
-        sprintf(temp, "%d", outputdigital1[i]);
-        
-        if(i<(SamplesN-1)){strcat(temp, ",");}
-        
-        
-        strcat(D1_samples, temp);
-        //printf("\n%s", A0_samples);
-    }
-    strcat(D1_samples, "]");
-    strcat(JSON, D1_samples);
-    
-    
-    
-    
-    strcat(JSON, ",\"DB\":[");
-    char DB_samples[MAX_JSON_SIZE];
-    for(int i=0; i<MAX_JSON_SIZE; i++){DB_samples[i] = '\0';}
-
-
-    for(int i=0; i<SamplesN; i++){
-        //CLEAN
-        for(int i=0; i<10; i++){temp[i] = '\0';}
-        
-        sprintf(temp, "%d", outputdigitalB[i]);
-        
-        if(i<(SamplesN-1)){strcat(temp, ",");}
-        
-        
-        strcat(DB_samples, temp);
-        //printf("\n%s", A0_samples);
-    }
-    strcat(DB_samples, "]");
-    strcat(JSON, DB_samples);
-    
-    strcat(JSON, "}");
-    
-    
-    printf("%s", JSON);
-
-    return 0;
-}*/
 
 void timer_initialize(){
     T1CON = 0x00; //Stops the Timer1 and reset control reg.
@@ -329,11 +176,25 @@ void JsonParser(){
             samples = atoi(position + 1); 
         }
     }
-    position = strstr(json, "\"DW\""); 
+    position = strstr(json, "\"DW1\""); 
     if (position != NULL) { 
         position = strchr(position, ':'); 
         if (position != NULL) {
-            digital1write = atoi(position + 1); 
+            digitalwrite1 = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"DW2\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            digitalwrite2 = atoi(position + 1); 
+        }
+    }
+    position = strstr(json, "\"DW3\""); 
+    if (position != NULL) { 
+        position = strchr(position, ':'); 
+        if (position != NULL) {
+            digitalwrite3 = atoi(position + 1); 
         }
     }
 }
@@ -378,39 +239,41 @@ void send_json()
     if (analogPortZ) {
         send_array_json("Az", analogPortZ_array, samples, &first);
     }
-
+    if (digital6 && !state_virtual) {
+        send_array_json("D6", digital6_array, samples, &first);
+    }
+    if (digital7 && !state_virtual) {
+        send_array_json("D7", digital7_array, samples, &first);
+    }
+    if (bidirecional && state_bidirecional) {
+        send_array_json("DB", bidirecional_array, samples, &first);
+    }
+    if (virtual && state_virtual) {
+        send_array_json("DV", virtual_array, samples, &first);
+    }
     UART1_Print ("}\r\n");
 
 }
 
 
 int main(int argc, char** argv){
-    
-    int adcvalue = 0;
-    int button = 0;
-
     timer_initialize();
     ADC_Setup();
     UART1Config();
     
     ANSD = 1;
     TRISA = 0;
+    ANSAbits.ANSA7 = 0;
     TRISDbits.TRISD6 = 1;
+    TRISDbits.TRISD7 = 1;
+    
+    
+    //AS 3 linhas seguintes inicializam os 3 pinos de saída como saída
+    TRISAbits.TRISA0 = 0;
+    TRISAbits.TRISA1 = 0;
+    TRISAbits.TRISA2 = 0;
+    
 
-    //char Config_Json[MAX_JSON_SIZE] = ""; 
-    //char Sender_JSON[MAX_JSON_SIZE] = ""; 
-    
-    //LCD
-    
-    //TRISA = 0x0000; 
-    //TRISE = 0x0000;
-    TRISE &= 0xFFF0; 
-    TRISDbits.TRISD4 = 0; 
-    TRISDbits.TRISD5 = 0;
-    TRISBbits.TRISB15 = 0; 
-    
-    ANSELBbits.ANSB15 = 0; // Garante que RB15 ï¿½ Digital (importante!)
-    
  
     while(1){
         if (UART1_Available())
@@ -434,6 +297,21 @@ int main(int argc, char** argv){
             i_json = 0;
             i_samples = 0;
         }
+        if (bidirecional){
+        if (!state_bidirecional) 
+        {
+            TRISAbits.TRISA7 = 0;  
+            LATAbits.LATA7 = 1;    
+        }
+        else 
+        {
+            LATAbits.LATA7 = 0;   
+            TRISAbits.TRISA7 = 1;  
+        }}
+
+            LATAbits.LATA0 = digitalwrite1; 
+            LATAbits.LATA1 = digitalwrite2;
+            LATAbits.LATA2 = digitalwrite3;
         if (read)
         {
             if (i_samples < samples)
@@ -443,8 +321,19 @@ int main(int argc, char** argv){
                 if (analogPortY)
                     analogPortY_array[i_samples] = ADC_Read(5);
                 if (analogPortZ)
-                    analogPortZ_array[i_samples] = ADC_Read(6);
-                //CONTINUAR ISTO PARA TODAS AS PORTAS
+                    analogPortZ_array[i_samples] = ADC_Read(2);
+                if (digital6 && !state_virtual)
+                    digital6_array[i_samples] = digital_Read(54);
+                if (digital7 && !state_virtual)
+                    digital7_array[i_samples] = digital_Read(55);
+                if (bidirecional && state_bidirecional)
+                {
+                    TRISAbits.TRISA7 = 1;
+                    bidirecional_array[i_samples] = digital_Read(56);
+                }    
+                if (virtual && state_virtual)
+                    virtual_array[i_samples] = 2*digital_Read(55) + digital_Read(54);
+                
                 i_samples++;
                 if (i_samples >= samples)
                 {
@@ -454,127 +343,7 @@ int main(int argc, char** argv){
             }
             read = 0;
         }
-        
     }
 
-    /*while(1){
-        //adcvalue = ADC_Read(4);
-        digital_Write(digital_Read());
-        UART1_PrintINT (button); //podemos mudar isto para sprintf()
-        UART1_Write('\n');
-    }*/
-
-     /*while(1){
-        int RD6_value = digital_Read(54); //Pin 54 -> RD6
-        int RD7_value = digital_Read(55); //Pin 55 -> RD7
-        
-        
-        int adc1 = ADC_Read(analogPort1);
-        int adc2 = ADC_Read(analogPort2);
-        int adc3 = ADC_Read(analogPort3);
-        
-        //config
-        //NAO ACABADO PRECISA
-        if (UART1_Available()) {
-            char received = UART1_Read();
-   
-        }
-        UART1_Write('a');
-        if(PrintFLAG){
-            UART1_Write('o');
-            UART1_Write('\n');
-            PrintFLAG = 0;
-        }
-    }*/
-    
-    
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-#include <stdio.h>
-#include <stdlib.h>
-#include <xc.h>
-
-#include "p24fj1024gb610.h"
-
-//#define Fos 8000000
-//#define PreScalar 256
-//#define IPerS Fos / 2 / PreScalar
-//#define FCY 4000000
-//
-//// Configuration Bits TIMER1
-//#pragma config FNOSC = PRI
-//#pragma config POSCMOD = HS
-//#pragma config JTAGEN = OFF
-//#pragma config FWDTEN = OFF
-//
-//void setupTimer1()
-//{    
-//    TMR1 = 0;
-//    PR1 = IPerS;
-//    IPC0bits.T1IP = 0x7;
-//    IFS0bits.T1IF = 0;
-//    IEC0bits.T1IE = 1;
-//    // 0bx1000 0000 0011 0000
-//    T1CON = 0x8030;
-//}
-//
-//void __attribute__ ( ( interrupt, __shadow__ ) ) _T1Interrupt(void)
-//{
-//    IFS0bits.T1IF = 0;
-//    TMR1 = 0;
-//} 
-
-int main(int argc, char** argv) {
-    ANSD = 1;
-    TRISA = 0;
-    TRISDbits.TRISD6 = 1;
-    
-    //LATA = 0xFFFF;
-    LATA = 0;
-
-    
-    while(1){
-       // run
-       if (!PORTDbits.RD6) {
-           //LATA = ~LATA;
-           PORTAbits.RA0 = 1;
-           PORTAbits.RA2 = 1;
-       }
-       if (!PORTDbits.RD7) {
-           //LATA = ~LATA;
-           PORTAbits.RA0 = 0;
-           //PORTAbits.RA2 = 0;
-       }
-   }
-    return (1);
-}
-*/

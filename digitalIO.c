@@ -16,6 +16,8 @@ int digital_Read(int portNumber)
         
         case 55: return (!PORTDbits.RD7);
         
+        case 56: return (!PORTAbits.RA7);
+        
         default: return -1;
     }
     
